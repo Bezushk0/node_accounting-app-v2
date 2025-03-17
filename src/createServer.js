@@ -8,9 +8,11 @@ function createServer() {
   // Return the server (express app)
   const app = express();
 
+  app.use(express.json());
+
   const users = [];
 
-  app.get('/users', express.json(), async (req, res) => {
+  app.get('/users', async (req, res) => {
     res.send(users);
   });
 
@@ -27,7 +29,7 @@ function createServer() {
     res.send(user);
   });
 
-  app.post('/users', express.json(), async (req, res) => {
+  app.post('/users', async (req, res) => {
     const { name } = req.body;
     const newId = Math.max(...users.map((item) => item.id), 0) + 1;
 
@@ -64,7 +66,7 @@ function createServer() {
     res.sendStatus(204);
   });
 
-  app.patch('/users/:id', express.json(), async (req, res) => {
+  app.patch('/users/:id', async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
 
@@ -89,8 +91,13 @@ function createServer() {
 
   const expenses = [];
 
-  app.get('/expenses', express.json(), async (req, res) => {
-    const { userId, from, to, categories: category } = req.query;
+  app.get('/expenses', async (req, res) => {
+    const {
+      userId,
+      from: fromDate,
+      to: toDate,
+      categories: category,
+    } = req.query;
     let filteredExpenses = [...expenses];
 
     if (userId) {
@@ -99,13 +106,13 @@ function createServer() {
       );
     }
 
-    if (from && to) {
+    if (fromDate && toDate) {
       filteredExpenses = filteredExpenses.filter((expense) => {
         const expenseDate = Date.parse(expense.spentAt);
-        const fromDate = Date.parse(from);
-        const toDate = Date.parse(to);
+        const parsedFromDate = Date.parse(fromDate);
+        const parsedToDate = Date.parse(toDate);
 
-        return expenseDate >= fromDate && expenseDate <= toDate;
+        return expenseDate >= parsedFromDate && expenseDate <= parsedToDate;
       });
     }
 
@@ -118,20 +125,24 @@ function createServer() {
     res.send(filteredExpenses);
   });
 
-  app.post('/expenses', express.json(), async (req, res) => {
+  app.post('/expenses', async (req, res) => {
     const { userId, spentAt, title, amount, category, note } = req.body;
 
     if (
       typeof userId !== 'number' ||
+      isNaN(userId) ||
       typeof spentAt !== 'string' ||
+      !spentAt.trim() ||
       typeof title !== 'string' ||
+      !title.trim() ||
       typeof amount !== 'number' ||
+      isNaN(amount) ||
       typeof category !== 'string' ||
-      typeof note !== 'string'
+      !category.trim() ||
+      typeof note !== 'string' ||
+      !note.trim()
     ) {
-      res.sendStatus(400);
-
-      return;
+      return res.sendStatus(400);
     }
 
     const assignedUser = users.find((user) => user.id === +userId);
@@ -177,7 +188,7 @@ function createServer() {
   app.delete('/expenses/:id', async (req, res) => {
     const { id } = req.params;
 
-    const index = expenses.findIndex((user) => user.id === +id);
+    const index = expenses.findIndex((expense) => expense.id === +id);
 
     if (index === -1) {
       res.sendStatus(404);
@@ -190,9 +201,20 @@ function createServer() {
     res.sendStatus(204);
   });
 
-  app.patch('/expenses/:id', express.json(), async (req, res) => {
+  app.patch('/expenses/:id', async (req, res) => {
     const { id } = req.params;
     const data = req.body;
+
+    if (
+      (data.userId && typeof data.userId !== 'number') ||
+      (data.spentAt && typeof data.spentAt !== 'string') ||
+      (data.title && typeof data.title !== 'string') ||
+      (data.amount && typeof data.amount !== 'number') ||
+      (data.category && typeof data.category !== 'string') ||
+      (data.note && typeof data.note !== 'string')
+    ) {
+      return res.status(400);
+    }
 
     const targetExpense = expenses.find((expense) => expense.id === +id);
 
